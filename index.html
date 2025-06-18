@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>会計呼び出し管理画面</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="admin-panel admin-font-size">
+        <header class="admin-header">
+            <h1>会計呼び出し管理画面</h1>
+            <div class="header-controls">
+                <div class="date-range-picker">
+                    <input type="date" id="start-date">
+                    <span>～</span>
+                    <input type="date" id="end-date">
+                </div>
+                <button id="export-csv-btn">CSV出力</button>
+                <button id="reset-data-btn">呼出番号リセット</button>
+            </div>
+        </header>
+        <section class="register-section">
+            <h2>新規受付</h2>
+            <input type="text" id="patient-id-input" placeholder="患者ID (7桁)" maxlength="7">
+            <input type="text" id="reception-num-input" placeholder="受付番号">
+            <button id="register-btn" class="register-main-btn">登録</button>
+        </section>
+        
+        <div class="lists-container">
+            <section class="list-section">
+                <h2>待機中リスト</h2>
+                <ul id="waiting-list" class="patient-list"></ul>
+            </section>
+            
+            <section class="list-section">
+                <h2>伝達事項リスト</h2>
+                <ul id="absent-list" class="patient-list"></ul>
+            </section>
+        </div>
+    </div>
+    
+    <div id="admin-fullscreen-alert" class="fullscreen-alert hidden">
+        <div class="alert-message">
+            <div id="admin-alert-text" class="alert-number-large"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

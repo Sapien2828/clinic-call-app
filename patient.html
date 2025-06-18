@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>会計のご案内</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="patient-view" class="patient-view-simulation">
+        <header class="admin-header">
+            <h1>フロア受付 会計のご案内</h1>
+        </header>
+        <div id="patient-view-container">
+            <div class="patient-view-section completed">
+                <h3>会計処理済み番号<small>（お呼びしました）</small></h3>
+                <div id="patient-completed-numbers" class="patient-number-display">---</div>
+            </div>
+            <div class="patient-view-section waiting">
+                <h3>会計準備中の番号
+                    <small>フロア受付付近でおかけになってお待ちください</small>
+                </h3>
+                <div id="patient-waiting-numbers" class="patient-number-display">---</div>
+                <div id="wait-time" class="wait-time-display">---</div>
+            </div>
+             <div class="patient-view-section absent">
+                <h3>伝達事項あり
+                    <small>フロア受付の職員に声をかけてください。</small>
+                </h3>
+                <div id="patient-absent-numbers" class="patient-number-display">---</div>
+            </div>
+        </div>
+        
+        <div id="audio-unlock-overlay">
+            <div class="audio-choice-container">
+                <h2>音声通知</h2>
+                <div class="buttons">
+                    <button id="start-with-audio-btn" class="primary">音声ありで開始</button>
+                    <button id="start-without-audio-btn">音声なしで開始</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="patient-fullscreen-alert" class="fullscreen-alert hidden">
+        <div class="alert-message">
+            <div id="patient-alert-text" class="alert-number-large"></div>
+            <div>フロア受付までお越しください</div>
+        </div>
+    </div>
+    
+    <button id="audio-toggle-btn" class="hidden">🔊 音声ON</button>
+
+    <script src="patient-script.js"></script>
+</body>
+</html>

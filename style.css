@@ -1,0 +1,156 @@
+body {
+    font-family: 'Meiryo', 'Helvetica Neue', 'Arial', 'Hiragino Sans', sans-serif;
+    background-color: #f4f7f9;
+    margin: 0;
+}
+.admin-panel, .patient-view-simulation {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin: 20px;
+}
+.admin-font-size { font-size: 14px; }
+.admin-font-size h1 { font-size: 1.5em; margin: 0; }
+.admin-font-size h2 { font-size: 1.2em; }
+
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.date-range-picker {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.header-controls input[type="date"] {
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+.header-controls button {
+    padding: 8px 15px;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+#export-csv-btn { background-color: #28a745; }
+#export-csv-btn:hover { background-color: #218838; }
+#reset-data-btn { background-color: #dc3545; }
+#reset-data-btn:hover { background-color: #c82333; }
+
+.register-section { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+.register-section input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 1.1em; }
+/* 修正点: 新規受付セクションのフォントサイズ拡大 */
+.register-section h2 {
+    font-size: 1.5em; /* 1.2emから拡大 */
+}
+.register-main-btn { 
+    padding: 8px 15px; 
+    background-color: #007bff; 
+    color: white; 
+    border: none; 
+    border-radius: 4px; 
+    cursor: pointer; 
+    font-size: 1.2em; /* 1emから拡大 */
+    font-weight: bold;
+}
+.register-main-btn:hover { background-color: #0056b3; }
+
+
+.lists-container { display: flex; gap: 20px; }
+.list-section { flex: 1; }
+.patient-list { list-style-type: none; padding: 0; min-height: 300px; background: #f9f9f9; border: 1px dashed #ccc; border-radius: 4px; padding: 10px; }
+.patient-list li { background: #e9ecef; padding: 10px; margin-bottom: 5px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; }
+.patient-list li.is-calling { border-left: 5px solid #d93636; background-color: #fff3cd; }
+.patient-list .patient-info { display: flex; flex-direction: column; align-items: flex-start; }
+.patient-list .patient-info .info-num { font-weight: bold; cursor: pointer; }
+.patient-list .patient-info .info-num:hover { color: #0056b3; }
+.patient-list .patient-info .info-id { font-size: 0.9em; color: #555; }
+.patient-list .handle { cursor: move; font-size: 1.5em; color: #555; padding: 0 10px; }
+.patient-list .buttons button { margin-left: 5px; cursor: pointer; padding: 4px 8px; }
+.dragging { opacity: 0.5; background: #cce5ff; }
+
+/* --- 患者様用画面のスタイル --- */
+.patient-view-simulation { text-align: center; transition: box-shadow 0.3s ease-in-out; position: relative; }
+@keyframes pulse-border {
+    0% { box-shadow: 0 0 15px 5px rgba(255, 193, 7, 0.5); }
+    50% { box-shadow: 0 0 25px 10px rgba(255, 193, 7, 0.8); }
+    100% { box-shadow: 0 0 15px 5px rgba(255, 193, 7, 0.5); }
+}
+.is-calling-active { animation: pulse-border 2s infinite; }
+#patient-view-container { display: flex; flex-wrap: wrap; gap: 20px; align-items: stretch; }
+.patient-view-section { flex: 1; min-width: 280px; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; background-color: #f8f9fa; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.patient-view-section h3 { margin: 0 0 15px 0; font-size: 1.8em; color: #333; }
+.patient-view-section h3 small { font-size: 0.7em; font-weight: normal; color: #555; display: block; margin-top: 5px;}
+.patient-number-display { font-size: 2.2em; font-weight: bold; color: #333; letter-spacing: 2px; min-height: 40px; padding: 0 10px; word-wrap: break-word; }
+.patient-view-section.completed .patient-number-display { color: #28a745; font-size: 2.5em; }
+.patient-view-section.waiting .patient-number-display { color: #007bff; }
+.patient-view-section.absent .patient-number-display { color: #6c757d; }
+.wait-time-display { margin-top: 15px; padding: 10px; font-size: 1.2em; font-weight: bold; color: #495057; background-color: #e9ecef; border-radius: 5px; }
+.hidden { display: none !important; }
+
+/* --- 全画面アラート共通スタイル --- */
+.fullscreen-alert {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background-color: rgba(0, 0, 0, 0.75);
+    color: white;
+    display: flex; justify-content: center; align-items: center;
+    z-index: 1000;
+}
+.alert-message { text-align: center; line-height: 1.6; }
+.highlight { background-color: #ffc107; color: #000; padding: 0.2em 0.5em; border-radius: 5px; }
+#patient-fullscreen-alert .alert-message { font-size: 2.8em; }
+#patient-fullscreen-alert .alert-number-large { font-size: 2.5em; font-weight: bold; }
+#admin-fullscreen-alert .alert-message { font-size: 2.2em; }
+#admin-fullscreen-alert .alert-number-large { font-size: 1em; font-weight: bold; }
+
+/* --- 音声再生を開始させるためのオーバーレイ --- */
+#audio-unlock-overlay {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(255, 255, 255, 0.98);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    z-index: 2000;
+}
+.audio-choice-container { text-align: center; }
+.audio-choice-container h2 { font-size: 2em; color: #333; }
+.audio-choice-container .buttons { display: flex; gap: 20px; margin-top: 20px; }
+.audio-choice-container button {
+    font-size: 1.5em;
+    padding: 15px 30px;
+    cursor: pointer;
+    border-radius: 10px;
+    border: 2px solid #007bff;
+    background-color: #fff;
+    color: #007bff;
+    min-width: 250px;
+}
+.audio-choice-container button.primary { background-color: #007bff; color: #fff; }
+
+#audio-toggle-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 15px;
+    font-size: 1em;
+    border-radius: 50px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    cursor: pointer;
+    z-index: 1500;
+}
