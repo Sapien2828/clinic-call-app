@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const startWithoutAudioBtn = document.getElementById('start-without-audio-btn');
     const waitTimeDiv = document.getElementById('wait-time');
     const audioToggleBtn = document.getElementById('audio-toggle-btn');
-    const chimeSound = new Audio('chime.mp3');
+    const chimeSound = new Audio('chime.mp3'); // 注意: このパスも絶対パス /<リポジトリ名>/chime.mp3 に変更が必要な場合があります
 
     // --- 変数定義 ---
     let lastCallingNumbers = new Set();
@@ -56,6 +56,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     startWithAudioBtn.addEventListener('click', () => initializeApp(true));
     startWithoutAudioBtn.addEventListener('click', () => initializeApp(false));
+
+    // 修正点: Page Visibility APIを使用して、画面復帰時にデータを更新する
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            console.log("ページが再び表示されました。データを再描画します。");
+            renderPatientView();
+        }
+    });
 
     // --- 関数定義 ---
     function groupConsecutiveNumbers(numbers) {
