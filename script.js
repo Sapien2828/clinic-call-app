@@ -50,9 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateDatabase() {
         function getListItems(listElement) {
             return [...listElement.children].map(item => ({
-                num: item.dataset.num,
-                id: item.dataset.id,
-                timestamp: item.dataset.timestamp,
+                num: item.dataset.num, id: item.dataset.id, timestamp: item.dataset.timestamp,
                 isCalling: item.classList.contains('is-calling')
             }));
         }
@@ -65,6 +63,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // --- イベントリスナー ---
+    function enforceNumericInput(event) { event.target.value = event.target.value.replace(/[^0-9]/g, ''); }
+    patientIdInput.addEventListener('input', enforceNumericInput);
+    receptionNumInput.addEventListener('input', enforceNumericInput);
+
+    // 修正点: ID入力後のフォーカス移動機能を復元
+    patientIdInput.addEventListener('input', (e) => {
+        if (e.target.value.length === 7) {
+            receptionNumInput.focus();
+        }
+    });
+
+    // 修正点: Enterキーでの登録機能を復元
+    receptionNumInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            registerBtn.click();
+        }
+    });
+
     registerBtn.addEventListener('click', () => {
         const num = receptionNumInput.value.trim();
         const id = patientIdInput.value.trim();
@@ -101,10 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const toISOStringWithTimezone = (date) => new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
     endDateInput.value = toISOStringWithTimezone(today);
     startDateInput.value = toISOStringWithTimezone(today);
-
-    function enforceNumericInput(event) { event.target.value = event.target.value.replace(/[^0-9]/g, ''); }
-    patientIdInput.addEventListener('input', enforceNumericInput);
-    receptionNumInput.addEventListener('input', enforceNumericInput);
 
     // --- ドラッグ＆ドロップ機能 ---
     [waitingList, absentList].forEach(list => {
@@ -152,21 +165,19 @@ document.addEventListener('DOMContentLoaded', () => {
             buttonsHtml = `<button class="call-btn">呼出</button><button class="complete-btn">完了</button>`;
         }
         item.innerHTML = `<div class="handle">≡</div>
-            <div class="patient-info"><span class="info-num">${num}番</span><span class="info-id">ID: ${id}</span></div>
+            <div class="patient-info"><span class="info-num editable">${num}番</span><span class="info-id">ID: ${id}</span></div>
             <div class="buttons">${buttonsHtml}</div>`;
         addButtonListeners(item);
     }
 
     function addButtonListeners(item) {
-        const findItemInState = (listName) => (appState[listName] || []).find(p => p.num === item.dataset.num);
-        
+        // 修正点: 番号修正機能を復元
+        item.querySelector('.info-num.editable')?.addEventListener('click', () => editNumber(item));
+
         item.querySelector('.call-btn')?.addEventListener('click', () => {
-            let patient = findItemInState('waiting');
+            let patient = (appState.waiting || []).find(p => p.num === item.dataset.num);
             if (patient) {
                 patient.isCalling = true;
-                const index = appState.waiting.indexOf(patient);
-                appState.waiting.splice(index, 1);
-                appState.waiting.unshift(patient);
                 appStateRef.set(appState);
 
                 adminAlertText.innerHTML = `<span class="highlight">${patient.num}番 を呼び出し中です</span>`;
@@ -194,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         item.querySelector('.absent-btn')?.addEventListener('click', () => {
-            let patient = findItemInState('waiting');
+            let patient = (appState.waiting || []).find(p => p.num === item.dataset.num);
             if (patient) {
                 patient.isCalling = false;
                 if (!appState.absent) appState.absent = [];
@@ -205,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         item.querySelector('.recall-btn')?.addEventListener('click', () => {
-            let patient = findItemInState('absent');
+            let patient = (appState.absent || []).find(p => p.num === item.dataset.num);
             if (patient) {
                 if (!appState.waiting) appState.waiting = [];
                 appState.waiting.push(patient);
@@ -213,6 +224,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 appStateRef.set(appState);
             }
         });
+    }
+
+    // 修正点: 番号修正機能を復元
+    function editNumber(item) {
+        const currentNum = item.dataset.num;
+        const newNum = prompt(`新しい受付番号を入力してください (現在: ${currentNum})`, currentNum);
+        if (newNum === null || newNum.trim() === '') return;
+        if (Number(newNum) <= 0 || !/^\d+$/.test(newNum)) {
+            alert('受付番号は1以上の整数を入力してください。'); return;
+        }
+
+        const patient = (appState.waiting || []).find(p => p.num === currentNum) || (appState.absent || []).find(p => p.num === currentNum);
+        if(patient) {
+            patient.num = newNum;
+            appStateRef.set(appState);
+        }
     }
 
     function exportToCSV() {

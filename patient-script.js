@@ -64,12 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => patientAlert.classList.add('hidden'), 10000);
 
             if (isAudioEnabled) {
-                chimeSound.play().catch(e => console.error("音声の再生に失敗:", e));
-                chimeSound.onended = () => {
-                    const utterance = new SpeechSynthesisUtterance(`${newCallNumber}番のかた、会計の準備が整いました。フロア受付までお越しください。`);
-                    utterance.lang = 'ja-JP';
-                    speechSynthesis.speak(utterance);
-                };
+                // 修正点: iOSで動作させるため、呼び出し音と音声案内を同時にトリガーする
+                chimeSound.play().catch(e => console.error("チャイム再生に失敗:", e));
+                
+                const utterance = new SpeechSynthesisUtterance(`${newCallNumber}番のかた、会計の準備が整いました。フロア受付までお越しください。`);
+                utterance.lang = 'ja-JP';
+                speechSynthesis.speak(utterance);
             }
         }
         lastCallingNumbers = currentCallingNumbers;
@@ -95,8 +95,14 @@ document.addEventListener('DOMContentLoaded', () => {
         audioToggleBtn.classList.remove('hidden');
         updateAudioToggleButton();
         if (isAudioEnabled) {
+            // 修正点: iOSの音声再生制限を解除するための「無音再生」
             chimeSound.volume = 0;
             chimeSound.play().catch(() => {});
+            
+            const silentUtterance = new SpeechSynthesisUtterance(' ');
+            silentUtterance.volume = 0;
+            speechSynthesis.speak(silentUtterance);
+
             chimeSound.volume = 1;
         }
         localStorage.setItem('audioChoice', isAudioEnabled ? 'on' : 'off');
