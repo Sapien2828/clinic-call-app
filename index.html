@@ -48,12 +48,19 @@
             </section>
         </div>
     </div>
+    
+    <div id="admin-fullscreen-alert" class="fullscreen-alert hidden">
+        <div class="alert-message">
+            <div id="admin-alert-text" class="alert-number-large"></div>
+        </div>
+    </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     
     <script>
+      // ご提供いただいたConfig情報を埋め込み済みです
       const firebaseConfig = {
         apiKey: "AIzaSyCvyq9yVNHe0HnC6TIsQxZxETPG5AJBvN0",
         authDomain: "clinic-call-app.firebaseapp.com",

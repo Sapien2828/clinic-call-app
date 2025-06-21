@@ -9,8 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportCsvBtn = document.getElementById('export-csv-btn');
     const startDateInput = document.getElementById('start-date');
     const endDateInput = document.getElementById('end-date');
-
-    // QRコード関連の要素
+    const adminAlert = document.getElementById('admin-fullscreen-alert');
+    const adminAlertText = document.getElementById('admin-alert-text');
     const scanQrBtn = document.getElementById('scan-qr-btn');
     const scannerContainer = document.getElementById('qr-scanner-container');
     const videoPreview = document.getElementById('qr-video-preview');
@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let appState = { waiting: [], absent: [], completed: [] };
     let draggedItem = null;
     let videoStream = null;
+    let animationFrameId = null;
 
     // --- Firebaseからデータを読み込み、変更を監視 ---
     appStateRef.on('value', (snapshot) => {
@@ -32,13 +33,32 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAllLists();
     });
 
+    function renderAllLists() {
+        waitingList.innerHTML = '';
+        absentList.innerHTML = '';
+        (appState.waiting || []).forEach(itemData => createListItem(itemData, waitingList));
+        (appState.absent || []).forEach(itemData => createListItem(itemData, absentList));
+    }
+
+    function createListItem(itemData, targetList) {
+        const listItem = document.createElement('li');
+        listItem.dataset.num = itemData.num;
+        listItem.dataset.id = itemData.id;
+        listItem.dataset.timestamp = itemData.timestamp;
+        if(itemData.isCalling) { listItem.classList.add('is-calling'); }
+        listItem.draggable = true;
+        targetList.appendChild(listItem);
+        updateListItemContent(listItem);
+    }
+    
     // --- QRコードスキャナ関連の処理 ---
     scanQrBtn.addEventListener('click', startScanner);
     closeScannerBtn.addEventListener('click', stopScanner);
 
     function startScanner() {
-        if (!patientIdInput.value.trim() || patientIdInput.value.trim().length !== 7) {
+        if (patientIdInput.value.trim().length !== 7) {
             alert('先に正しい患者ID (7桁) を入力してください。');
+            patientIdInput.focus();
             return;
         }
         scannerContainer.classList.remove('hidden');
@@ -46,8 +66,10 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(stream => {
                 videoStream = stream;
                 videoPreview.srcObject = stream;
-                videoPreview.play();
-                requestAnimationFrame(tick);
+                videoPreview.onloadedmetadata = () => {
+                    videoPreview.play();
+                    tick();
+                };
             })
             .catch(err => {
                 console.error("カメラのアクセスに失敗しました:", err);
@@ -57,40 +79,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function stopScanner() {
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
         if (videoStream) {
             videoStream.getTracks().forEach(track => track.stop());
+            videoStream = null;
         }
         scannerContainer.classList.add('hidden');
     }
 
     function tick() {
-        if (videoPreview.readyState === videoPreview.HAVE_ENOUGH_DATA) {
+        if (videoStream && videoPreview.readyState === videoPreview.HAVE_ENOUGH_DATA) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            canvas.width = videoPreview.videoWidth;
             canvas.height = videoPreview.videoHeight;
+            canvas.width = videoPreview.videoWidth;
             ctx.drawImage(videoPreview, 0, 0, canvas.width, canvas.height);
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                inversionAttempts: "dontInvert",
-            });
+            const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
 
-            if (code) {
+            if (code && code.data) {
                 stopScanner();
                 receptionNumInput.value = code.data;
-                registerBtn.click(); // 自動で登録ボタンをクリック
-            } else {
-                if (!scannerContainer.classList.contains('hidden')) {
-                    requestAnimationFrame(tick);
-                }
-            }
-        } else {
-            if (!scannerContainer.classList.contains('hidden')) {
-                requestAnimationFrame(tick);
+                registerBtn.click();
+                return; 
             }
         }
+        animationFrameId = requestAnimationFrame(tick);
     }
-     
+    
     // --- イベントリスナー ---
     function enforceNumericInput(event) { event.target.value = event.target.value.replace(/[^0-9]/g, ''); }
     patientIdInput.addEventListener('input', enforceNumericInput);
@@ -146,31 +165,6 @@ document.addEventListener('DOMContentLoaded', () => {
     endDateInput.value = toISOStringWithTimezone(today);
     startDateInput.value = toISOStringWithTimezone(today);
 
-    // --- ドラッグ＆ドロップ機能 ---
-    [waitingList, absentList].forEach(list => {
-        list.addEventListener('dragstart', (e) => {
-            draggedItem = e.target;
-            setTimeout(() => e.target.classList.add('dragging'), 0);
-        });
-        list.addEventListener('dragend', (e) => { e.target.classList.remove('dragging'); });
-        list.addEventListener('dragover', (e) => { e.preventDefault(); });
-        list.addEventListener('drop', (e) => {
-            e.preventDefault();
-            if (!draggedItem) return;
-            const targetList = e.currentTarget;
-            const afterElement = getDragAfterElement(targetList, e.clientY);
-            if (draggedItem.parentElement !== targetList) {
-                targetList.appendChild(draggedItem);
-                draggedItem.classList.remove('is-calling');
-            } else {
-                if (afterElement == null) { targetList.appendChild(draggedItem); }
-                else { targetList.insertBefore(draggedItem, afterElement); }
-            }
-            updateListItemContent(draggedItem);
-            updateDatabase();
-        });
-    });
-
     function getDragAfterElement(container, y) {
         const draggableElements = [...container.querySelectorAll('li:not(.dragging)')];
         return draggableElements.reduce((closest, child) => {
@@ -180,12 +174,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
 
-    // --- UI更新とボタン操作 ---
     function updateListItemContent(item) {
         const num = item.dataset.num, id = item.dataset.id;
         let buttonsHtml = '';
         if (item.parentElement === absentList) {
-            // 修正点: 「受付取消」ボタンを追加
             buttonsHtml = `<button class="recall-btn">待機へ</button><button class="complete-btn">完了</button><button class="cancel-btn">受付取消</button>`;
         } else if (item.classList.contains('is-calling')) {
             buttonsHtml = `<button class="complete-btn">完了</button><button class="absent-btn">伝達事項へ</button>`;
@@ -204,31 +196,30 @@ document.addEventListener('DOMContentLoaded', () => {
         item.querySelector('.complete-btn')?.addEventListener('click', () => completePatient(item));
         item.querySelector('.absent-btn')?.addEventListener('click', () => moveToAbsent(item));
         item.querySelector('.recall-btn')?.addEventListener('click', () => moveToWaiting(item));
-        // 修正点: 「受付取消」ボタンのイベントリスナーを追加
         item.querySelector('.cancel-btn')?.addEventListener('click', () => cancelReception(item));
     }
 
     function editNumber(item) {
         const currentNum = item.dataset.num;
         const newNum = prompt(`新しい受付番号を入力してください (現在: ${currentNum})`, currentNum);
-        if (newNum === null || newNum.trim() === '') return;
-        if (Number(newNum) <= 0 || !/^\d+$/.test(newNum)) {
-            alert('受付番号は1以上の整数を入力してください。'); return;
-        }
+        if (newNum === null || newNum.trim() === '' || !/^\d+$/.test(newNum) || Number(newNum) <= 0) return;
 
-        const patient = (appState.waiting || []).find(p => p.num === currentNum) || (appState.absent || []).find(p => p.num === currentNum);
-        if(patient) {
-            patient.num = newNum;
-            appStateRef.set(appState);
-        }
+        const patientInWaiting = (appState.waiting || []).find(p => p.num === currentNum);
+        const patientInAbsent = (appState.absent || []).find(p => p.num === currentNum);
+        if (patientInWaiting) { patientInWaiting.num = newNum; }
+        if (patientInAbsent) { patientInAbsent.num = newNum; }
+        appStateRef.set(appState);
+    }
+    
+    function findPatient(num) {
+        return (appState.waiting || []).find(p => p.num === num) || (appState.absent || []).find(p => p.num === num);
     }
 
     function callPatient(item) {
-        let patient = (appState.waiting || []).find(p => p.num === item.dataset.num);
-        if (patient) {
+        let patient = findPatient(item.dataset.num);
+        if (patient && appState.waiting) {
             patient.isCalling = true;
             appStateRef.set(appState);
-
             adminAlertText.innerHTML = `<span class="highlight">${patient.num}番 を呼び出し中です</span>`;
             adminAlert.classList.remove('hidden');
             setTimeout(() => adminAlert.classList.add('hidden'), 5000);
@@ -237,17 +228,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function completePatient(item) {
         const num = item.dataset.num;
-        const patientData = (appState.waiting || []).find(p => p.num === num) || (appState.absent || []).find(p => p.num === num);
-        
-        if(!patientData) return;
+        const patientData = findPatient(num);
+        if (!patientData) return;
 
-        const completedPatientData = {
+        completionLogRef.push({
             num: patientData.num, id: patientData.id, registrationTimestamp: patientData.timestamp,
             completionTimestamp: firebase.database.ServerValue.TIMESTAMP
-        };
-        completionLogRef.push(completedPatientData);
+        });
 
-        const completedNum = Number(completedPatientData.num);
+        const completedNum = Number(patientData.num);
         if (!appState.completed) appState.completed = [];
         if (!appState.completed.includes(completedNum)) {
             appState.completed.push(completedNum);
@@ -259,8 +248,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function moveToAbsent(item) {
-        let patient = (appState.waiting || []).find(p => p.num === item.dataset.num);
-        if (patient) {
+        let patient = findPatient(item.dataset.num);
+        if (patient && appState.waiting) {
             patient.isCalling = false;
             if (!appState.absent) appState.absent = [];
             appState.absent.push(patient);
@@ -270,8 +259,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function moveToWaiting(item) {
-        let patient = (appState.absent || []).find(p => p.num === item.dataset.num);
-        if (patient) {
+        let patient = findPatient(item.dataset.num);
+        if (patient && appState.absent) {
             if (!appState.waiting) appState.waiting = [];
             appState.waiting.push(patient);
             appState.absent = appState.absent.filter(p => p.num !== patient.num);
@@ -279,15 +268,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 修正点: 受付取消機能を実装
     function cancelReception(item) {
         const num = item.dataset.num;
         if (confirm(`番号「${num}」の受付を完全に削除しますか？\nこの操作は元に戻せません。`)) {
             appState.waiting = (appState.waiting || []).filter(p => p.num !== num);
             appState.absent = (appState.absent || []).filter(p => p.num !== num);
-            // 完了リストからも削除（念のため）
             appState.completed = (appState.completed || []).filter(n => n !== Number(num));
-            
             appStateRef.set(appState);
         }
     }
@@ -299,39 +285,28 @@ document.addEventListener('DOMContentLoaded', () => {
         endDate.setHours(23, 59, 59, 999);
 
         completionLogRef.once('value').then((snapshot) => {
-            const completionLogData = snapshot.val();
-            if (!completionLogData) {
-                alert('完了ログがありません。'); return;
-            }
-            const filteredLog = Object.values(completionLogData).filter(item => {
-                const completionTime = new Date(item.completionTimestamp);
-                return completionTime >= startDate && completionTime <= endDate;
+            const logData = snapshot.val();
+            if (!logData) { alert('完了ログがありません。'); return; }
+            const filteredLog = Object.values(logData).filter(item => {
+                const compTime = new Date(item.completionTimestamp);
+                return compTime >= startDate && compTime <= endDate;
             });
 
-            if (filteredLog.length === 0) {
-                alert('指定された期間に完了した患者さんのデータはありません。'); return;
-            }
+            if (filteredLog.length === 0) { alert('指定された期間に完了した患者さんのデータはありません。'); return; }
 
-            let csvContent = '"受付番号","患者ID","受付日","受付時刻","完了日","完了時刻"\n';
+            let csv = '"受付番号","患者ID","受付日","受付時刻","完了日","完了時刻"\n';
             filteredLog.forEach(item => {
                 const regDate = new Date(Number(item.registrationTimestamp));
                 const compDate = new Date(item.completionTimestamp);
-                const row = [
-                    item.num, item.id,
-                    regDate.toLocaleDateString('ja-JP'),
-                    regDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-                    compDate.toLocaleDateString('ja-JP'),
-                    compDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                ].map(val => `"${val}"`).join(',');
-                csvContent += row + '\n';
+                csv += `"${item.num}","${item.id}","${regDate.toLocaleDateString('ja-JP')}","${regDate.toLocaleTimeString('ja-JP')}","${compDate.toLocaleDateString('ja-JP')}","${compDate.toLocaleTimeString('ja-JP')}"\n`;
             });
 
             const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
-            const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+            const blob = new Blob([bom, csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `会計完了ログ_${startDateInput.value}_to_${endDateInput.value}.csv`);
+            link.href = url;
+            link.download = `会計完了ログ_${startDateInput.value}_to_${endDateInput.value}.csv`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
