@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>会計呼び出し管理画面</title>
-    <link rel="stylesheet" href="/clinic-call-app/style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="admin-panel admin-font-size">
@@ -46,6 +46,24 @@
         </div>
     </div>
 
-    <script src="/clinic-call-app/script.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <script>
+      // ご提供いただいたConfig情報を埋め込み済みです
+      const firebaseConfig = {
+        apiKey: "AIzaSyCvyq9yVNHe0HnC6TIsQxZxETPG5AJBvN0",
+        authDomain: "clinic-call-app.firebaseapp.com",
+        databaseURL: "https://clinic-call-app-default-rtdb.firebaseio.com",
+        projectId: "clinic-call-app",
+        storageBucket: "clinic-call-app.appspot.com",
+        messagingSenderId: "920156660969",
+        appId: "1:920156660969:web:8cda6747a229dead31fc78"
+      };
+      
+      // Firebaseを初期化
+      firebase.initializeApp(firebaseConfig);
+    </script>
+    <script src="script.js"></script>
 </body>
 </html>

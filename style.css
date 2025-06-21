@@ -53,9 +53,8 @@ body {
 
 .register-section { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
 .register-section input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 1.1em; }
-/* 修正点: 新規受付セクションのフォントサイズ拡大 */
 .register-section h2 {
-    font-size: 1.5em; /* 1.2emから拡大 */
+    font-size: 1.5em;
 }
 .register-main-btn { 
     padding: 8px 15px; 
@@ -64,7 +63,7 @@ body {
     border: none; 
     border-radius: 4px; 
     cursor: pointer; 
-    font-size: 1.2em; /* 1emから拡大 */
+    font-size: 1.2em;
     font-weight: bold;
 }
 .register-main-btn:hover { background-color: #0056b3; }
