@@ -23,8 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- リアルタイム更新 ---
     appStateRef.on('value', (snapshot) => {
-        const state = snapshot.val();
-        renderPatientView(state || { waiting: [], absent: [], completed: [] });
+        renderPatientView(snapshot.val() || { waiting: [], absent: [], completed: [] });
     });
 
     // --- 表示を更新するメイン関数 ---
@@ -62,11 +61,14 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => patientAlert.classList.add('hidden'), 10000);
 
             if (isAudioEnabled) {
+                speechSynthesis.cancel(); // 念のため前の音声をキャンセル
+                
                 const utterance = new SpeechSynthesisUtterance(`${newCallNumber}番のかた、会計の準備が整いました。フロア受付までお越しください。`);
                 utterance.lang = 'ja-JP';
                 speechSynthesis.speak(utterance);
                 
                 setTimeout(() => {
+                    chimeSound.currentTime = 0;
                     chimeSound.play().catch(e => console.error("チャイム再生に失敗:", e));
                 }, 150);
             }
@@ -97,13 +99,15 @@ document.addEventListener('DOMContentLoaded', () => {
         updateAudioToggleButton();
         
         if (isAudioEnabled) {
-            // iOSの音声再生制限を解除するための「無音再生」
-            const silentUtterance = new SpeechSynthesisUtterance(' ');
-            speechSynthesis.speak(silentUtterance);
+            // iOSの音声再生制限を解除するための、意味のある音声再生
+            const welcomeUtterance = new SpeechSynthesisUtterance('音声通知を有効にしました');
+            welcomeUtterance.lang = 'ja-JP';
+            speechSynthesis.speak(welcomeUtterance);
             
-            const silentChime = new Audio('chime.mp3');
-            silentChime.volume = 0;
-            silentChime.play().catch(()=>{});
+            // chimeも一度再生しておく
+            chimeSound.volume = 0;
+            chimeSound.play().catch(()=>{});
+            chimeSound.volume = 1;
         }
     }
     

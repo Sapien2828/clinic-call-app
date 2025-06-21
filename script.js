@@ -34,10 +34,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function renderAllLists() {
+        const waitingPatients = appState.waiting || [];
+        const absentPatients = appState.absent || [];
+        
         waitingList.innerHTML = '';
         absentList.innerHTML = '';
-        (appState.waiting || []).forEach(itemData => createListItem(itemData, waitingList));
-        (appState.absent || []).forEach(itemData => createListItem(itemData, absentList));
+        
+        waitingPatients.forEach(itemData => createListItem(itemData, waitingList));
+        absentPatients.forEach(itemData => createListItem(itemData, absentList));
     }
 
     function createListItem(itemData, targetList) {
@@ -51,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateListItemContent(listItem);
     }
     
-    // --- QRコードスキャナ関連の処理 ---
+    // --- QRコードスキャナ関連 ---
     scanQrBtn.addEventListener('click', startScanner);
     closeScannerBtn.addEventListener('click', stopScanner);
 
@@ -93,9 +97,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function tick() {
         if (videoStream && videoPreview.readyState === videoPreview.HAVE_ENOUGH_DATA) {
             const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
             canvas.height = videoPreview.videoHeight;
             canvas.width = videoPreview.videoWidth;
+            const ctx = canvas.getContext('2d');
             ctx.drawImage(videoPreview, 0, 0, canvas.width, canvas.height);
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
@@ -116,32 +120,22 @@ document.addEventListener('DOMContentLoaded', () => {
     receptionNumInput.addEventListener('input', enforceNumericInput);
 
     patientIdInput.addEventListener('input', (e) => {
-        if (e.target.value.length === 7) {
-            receptionNumInput.focus();
-        }
+        if (e.target.value.length === 7) { receptionNumInput.focus(); }
     });
 
     receptionNumInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            registerBtn.click();
-        }
+        if (e.key === 'Enter') { e.preventDefault(); registerBtn.click(); }
     });
 
     registerBtn.addEventListener('click', () => {
         const num = receptionNumInput.value.trim();
         const id = patientIdInput.value.trim();
 
-        if (!num || Number(num) <= 0) {
-            alert('受付番号は1以上の整数を入力してください。'); return;
-        }
-        if (id.length !== 7 || !/^\d+$/.test(id)) {
-            alert('正しい患者ID (7桁) を入力してください。'); return;
-        }
+        if (!num || !/^\d+$/.test(num) || Number(num) <= 0) { alert('受付番号は1以上の整数を入力してください。'); return; }
+        if (id.length !== 7 || !/^\d+$/.test(id)) { alert('正しい患者ID (7桁) を入力してください。'); return; }
+        
         const allCurrentNumbers = [...(appState.waiting || []), ...(appState.absent || [])].map(p => p.num);
-        if (allCurrentNumbers.includes(num)) {
-            alert(`受付番号「${num}」は既に使用されています。`); return;
-        }
+        if (allCurrentNumbers.includes(num)) { alert(`受付番号「${num}」は既に使用されています。`); return; }
 
         const newPatient = { num, id, timestamp: Date.now(), isCalling: false };
         const newWaitingList = [...(appState.waiting || []), newPatient];
@@ -165,15 +159,57 @@ document.addEventListener('DOMContentLoaded', () => {
     endDateInput.value = toISOStringWithTimezone(today);
     startDateInput.value = toISOStringWithTimezone(today);
 
-    function getDragAfterElement(container, y) {
-        const draggableElements = [...container.querySelectorAll('li:not(.dragging)')];
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2;
-            return (offset < 0 && offset > closest.offset) ? { offset, element: child } : closest;
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
-    }
+    // --- ドラッグ＆ドロップ機能 ---
+    function setupDragAndDrop() {
+        [waitingList, absentList].forEach(list => {
+            list.addEventListener('dragstart', (e) => {
+                draggedItem = e.target.closest('li');
+                setTimeout(() => draggedItem.classList.add('dragging'), 0);
+            });
+            list.addEventListener('dragend', () => {
+                if (draggedItem) {
+                    draggedItem.classList.remove('dragging');
+                    draggedItem = null;
+                }
+            });
+            list.addEventListener('dragover', (e) => { e.preventDefault(); });
+            list.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (!draggedItem) return;
+                
+                const fromList = draggedItem.parentElement;
+                const toList = e.target.closest('ul.patient-list');
+                if (!toList) return;
 
+                const patientNum = draggedItem.dataset.num;
+                const patient = findPatient(patientNum);
+                if (!patient) return;
+
+                const newAppState = JSON.parse(JSON.stringify(appState)); // Deep copy
+
+                // 元のリストから削除
+                if (fromList.id === 'waiting-list') {
+                    newAppState.waiting = (newAppState.waiting || []).filter(p => p.num !== patientNum);
+                } else {
+                    newAppState.absent = (newAppState.absent || []).filter(p => p.num !== patientNum);
+                }
+
+                // 新しいリストに追加
+                patient.isCalling = false; // ドラッグ移動したら呼び出し状態は解除
+                if (toList.id === 'waiting-list') {
+                    if (!newAppState.waiting) newAppState.waiting = [];
+                    newAppState.waiting.push(patient);
+                } else {
+                    if (!newAppState.absent) newAppState.absent = [];
+                    newAppState.absent.push(patient);
+                }
+                appStateRef.set(newAppState);
+            });
+        });
+    }
+    setupDragAndDrop(); // ドラッグ＆ドロップ機能を有効化
+
+    // --- UI更新とボタン操作 ---
     function updateListItemContent(item) {
         const num = item.dataset.num, id = item.dataset.id;
         let buttonsHtml = '';
@@ -182,7 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (item.classList.contains('is-calling')) {
             buttonsHtml = `<button class="complete-btn">完了</button><button class="absent-btn">伝達事項へ</button>`;
         } else {
-            buttonsHtml = `<button class="call-btn">呼出</button><button class="complete-btn">完了</button>`;
+            buttonsHtml = `<button class="call-btn">呼出</button><button class="complete-btn">完了</button><button class="absent-btn">伝達事項へ</button>`;
         }
         item.innerHTML = `<div class="handle">≡</div>
             <div class="patient-info"><span class="info-num editable">${num}番</span><span class="info-id">ID: ${id}</span></div>
@@ -198,26 +234,26 @@ document.addEventListener('DOMContentLoaded', () => {
         item.querySelector('.recall-btn')?.addEventListener('click', () => moveToWaiting(item));
         item.querySelector('.cancel-btn')?.addEventListener('click', () => cancelReception(item));
     }
+    
+    function findPatient(num) {
+        return (appState.waiting || []).find(p => p.num === num) || (appState.absent || []).find(p => p.num === num);
+    }
 
     function editNumber(item) {
         const currentNum = item.dataset.num;
         const newNum = prompt(`新しい受付番号を入力してください (現在: ${currentNum})`, currentNum);
         if (newNum === null || newNum.trim() === '' || !/^\d+$/.test(newNum) || Number(newNum) <= 0) return;
 
-        const patientInWaiting = (appState.waiting || []).find(p => p.num === currentNum);
-        const patientInAbsent = (appState.absent || []).find(p => p.num === currentNum);
-        if (patientInWaiting) { patientInWaiting.num = newNum; }
-        if (patientInAbsent) { patientInAbsent.num = newNum; }
-        appStateRef.set(appState);
-    }
-    
-    function findPatient(num) {
-        return (appState.waiting || []).find(p => p.num === num) || (appState.absent || []).find(p => p.num === num);
+        const patient = findPatient(currentNum);
+        if(patient) {
+            patient.num = newNum;
+            appStateRef.set(appState);
+        }
     }
 
     function callPatient(item) {
         let patient = findPatient(item.dataset.num);
-        if (patient && appState.waiting) {
+        if (patient && (appState.waiting || []).some(p => p.num === patient.num)) {
             patient.isCalling = true;
             appStateRef.set(appState);
             adminAlertText.innerHTML = `<span class="highlight">${patient.num}番 を呼び出し中です</span>`;
@@ -227,8 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function completePatient(item) {
-        const num = item.dataset.num;
-        const patientData = findPatient(num);
+        const patientData = findPatient(item.dataset.num);
         if (!patientData) return;
 
         completionLogRef.push({
@@ -236,20 +271,17 @@ document.addEventListener('DOMContentLoaded', () => {
             completionTimestamp: firebase.database.ServerValue.TIMESTAMP
         });
 
-        const completedNum = Number(patientData.num);
         if (!appState.completed) appState.completed = [];
-        if (!appState.completed.includes(completedNum)) {
-            appState.completed.push(completedNum);
-        }
+        appState.completed.push(Number(patientData.num));
         
-        appState.waiting = (appState.waiting || []).filter(p => p.num !== num);
-        appState.absent = (appState.absent || []).filter(p => p.num !== num);
+        appState.waiting = (appState.waiting || []).filter(p => p.num !== patientData.num);
+        appState.absent = (appState.absent || []).filter(p => p.num !== patientData.num);
         appStateRef.set(appState);
     }
     
     function moveToAbsent(item) {
         let patient = findPatient(item.dataset.num);
-        if (patient && appState.waiting) {
+        if (patient && (appState.waiting || []).some(p => p.num === patient.num)) {
             patient.isCalling = false;
             if (!appState.absent) appState.absent = [];
             appState.absent.push(patient);
@@ -260,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function moveToWaiting(item) {
         let patient = findPatient(item.dataset.num);
-        if (patient && appState.absent) {
+        if (patient && (appState.absent || []).some(p => p.num === patient.num)) {
             if (!appState.waiting) appState.waiting = [];
             appState.waiting.push(patient);
             appState.absent = appState.absent.filter(p => p.num !== patient.num);
