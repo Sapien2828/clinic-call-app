@@ -67,14 +67,12 @@ document.addEventListener('DOMContentLoaded', () => {
     patientIdInput.addEventListener('input', enforceNumericInput);
     receptionNumInput.addEventListener('input', enforceNumericInput);
 
-    // 修正点: ID入力後のフォーカス移動機能を復元
     patientIdInput.addEventListener('input', (e) => {
         if (e.target.value.length === 7) {
             receptionNumInput.focus();
         }
     });
 
-    // 修正点: Enterキーでの登録機能を復元
     receptionNumInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -158,7 +156,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const num = item.dataset.num, id = item.dataset.id;
         let buttonsHtml = '';
         if (item.parentElement === absentList) {
-            buttonsHtml = `<button class="recall-btn">待機へ</button><button class="complete-btn">完了</button>`;
+            // 修正点: 「受付取消」ボタンを追加
+            buttonsHtml = `<button class="recall-btn">待機へ</button><button class="complete-btn">完了</button><button class="cancel-btn">受付取消</button>`;
         } else if (item.classList.contains('is-calling')) {
             buttonsHtml = `<button class="complete-btn">完了</button><button class="absent-btn">伝達事項へ</button>`;
         } else {
@@ -171,62 +170,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function addButtonListeners(item) {
-        // 修正点: 番号修正機能を復元
         item.querySelector('.info-num.editable')?.addEventListener('click', () => editNumber(item));
-
-        item.querySelector('.call-btn')?.addEventListener('click', () => {
-            let patient = (appState.waiting || []).find(p => p.num === item.dataset.num);
-            if (patient) {
-                patient.isCalling = true;
-                appStateRef.set(appState);
-
-                adminAlertText.innerHTML = `<span class="highlight">${patient.num}番 を呼び出し中です</span>`;
-                adminAlert.classList.remove('hidden');
-                setTimeout(() => adminAlert.classList.add('hidden'), 5000);
-            }
-        });
-
-        item.querySelector('.complete-btn')?.addEventListener('click', () => {
-            const completedPatientData = {
-                num: item.dataset.num, id: item.dataset.id, registrationTimestamp: item.dataset.timestamp,
-                completionTimestamp: firebase.database.ServerValue.TIMESTAMP
-            };
-            completionLogRef.push(completedPatientData);
-
-            const completedNum = Number(completedPatientData.num);
-            if (!appState.completed) appState.completed = [];
-            if (!appState.completed.includes(completedNum)) {
-                appState.completed.push(completedNum);
-            }
-            
-            appState.waiting = (appState.waiting || []).filter(p => p.num !== item.dataset.num);
-            appState.absent = (appState.absent || []).filter(p => p.num !== item.dataset.num);
-            appStateRef.set(appState);
-        });
-
-        item.querySelector('.absent-btn')?.addEventListener('click', () => {
-            let patient = (appState.waiting || []).find(p => p.num === item.dataset.num);
-            if (patient) {
-                patient.isCalling = false;
-                if (!appState.absent) appState.absent = [];
-                appState.absent.push(patient);
-                appState.waiting = appState.waiting.filter(p => p.num !== patient.num);
-                appStateRef.set(appState);
-            }
-        });
-        
-        item.querySelector('.recall-btn')?.addEventListener('click', () => {
-            let patient = (appState.absent || []).find(p => p.num === item.dataset.num);
-            if (patient) {
-                if (!appState.waiting) appState.waiting = [];
-                appState.waiting.push(patient);
-                appState.absent = appState.absent.filter(p => p.num !== patient.num);
-                appStateRef.set(appState);
-            }
-        });
+        item.querySelector('.call-btn')?.addEventListener('click', () => callPatient(item));
+        item.querySelector('.complete-btn')?.addEventListener('click', () => completePatient(item));
+        item.querySelector('.absent-btn')?.addEventListener('click', () => moveToAbsent(item));
+        item.querySelector('.recall-btn')?.addEventListener('click', () => moveToWaiting(item));
+        // 修正点: 「受付取消」ボタンのイベントリスナーを追加
+        item.querySelector('.cancel-btn')?.addEventListener('click', () => cancelReception(item));
     }
 
-    // 修正点: 番号修正機能を復元
     function editNumber(item) {
         const currentNum = item.dataset.num;
         const newNum = prompt(`新しい受付番号を入力してください (現在: ${currentNum})`, currentNum);
@@ -238,6 +190,75 @@ document.addEventListener('DOMContentLoaded', () => {
         const patient = (appState.waiting || []).find(p => p.num === currentNum) || (appState.absent || []).find(p => p.num === currentNum);
         if(patient) {
             patient.num = newNum;
+            appStateRef.set(appState);
+        }
+    }
+
+    function callPatient(item) {
+        let patient = (appState.waiting || []).find(p => p.num === item.dataset.num);
+        if (patient) {
+            patient.isCalling = true;
+            appStateRef.set(appState);
+
+            adminAlertText.innerHTML = `<span class="highlight">${patient.num}番 を呼び出し中です</span>`;
+            adminAlert.classList.remove('hidden');
+            setTimeout(() => adminAlert.classList.add('hidden'), 5000);
+        }
+    }
+
+    function completePatient(item) {
+        const num = item.dataset.num;
+        const patientData = (appState.waiting || []).find(p => p.num === num) || (appState.absent || []).find(p => p.num === num);
+        
+        if(!patientData) return;
+
+        const completedPatientData = {
+            num: patientData.num, id: patientData.id, registrationTimestamp: patientData.timestamp,
+            completionTimestamp: firebase.database.ServerValue.TIMESTAMP
+        };
+        completionLogRef.push(completedPatientData);
+
+        const completedNum = Number(completedPatientData.num);
+        if (!appState.completed) appState.completed = [];
+        if (!appState.completed.includes(completedNum)) {
+            appState.completed.push(completedNum);
+        }
+        
+        appState.waiting = (appState.waiting || []).filter(p => p.num !== num);
+        appState.absent = (appState.absent || []).filter(p => p.num !== num);
+        appStateRef.set(appState);
+    }
+    
+    function moveToAbsent(item) {
+        let patient = (appState.waiting || []).find(p => p.num === item.dataset.num);
+        if (patient) {
+            patient.isCalling = false;
+            if (!appState.absent) appState.absent = [];
+            appState.absent.push(patient);
+            appState.waiting = appState.waiting.filter(p => p.num !== patient.num);
+            appStateRef.set(appState);
+        }
+    }
+    
+    function moveToWaiting(item) {
+        let patient = (appState.absent || []).find(p => p.num === item.dataset.num);
+        if (patient) {
+            if (!appState.waiting) appState.waiting = [];
+            appState.waiting.push(patient);
+            appState.absent = appState.absent.filter(p => p.num !== patient.num);
+            appStateRef.set(appState);
+        }
+    }
+    
+    // 修正点: 受付取消機能を実装
+    function cancelReception(item) {
+        const num = item.dataset.num;
+        if (confirm(`番号「${num}」の受付を完全に削除しますか？\nこの操作は元に戻せません。`)) {
+            appState.waiting = (appState.waiting || []).filter(p => p.num !== num);
+            appState.absent = (appState.absent || []).filter(p => p.num !== num);
+            // 完了リストからも削除（念のため）
+            appState.completed = (appState.completed || []).filter(n => n !== Number(num));
+            
             appStateRef.set(appState);
         }
     }
