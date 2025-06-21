@@ -9,8 +9,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportCsvBtn = document.getElementById('export-csv-btn');
     const startDateInput = document.getElementById('start-date');
     const endDateInput = document.getElementById('end-date');
-    const adminAlert = document.getElementById('admin-fullscreen-alert');
-    const adminAlertText = document.getElementById('admin-alert-text');
+
+    // QRコード関連の要素
+    const scanQrBtn = document.getElementById('scan-qr-btn');
+    const scannerContainer = document.getElementById('qr-scanner-container');
+    const videoPreview = document.getElementById('qr-video-preview');
+    const closeScannerBtn = document.getElementById('close-scanner-btn');
 
     // --- Firebaseデータベースへの参照 ---
     const db = firebase.database();
@@ -20,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 変数定義 ---
     let appState = { waiting: [], absent: [], completed: [] };
     let draggedItem = null;
+    let videoStream = null;
 
     // --- Firebaseからデータを読み込み、変更を監視 ---
     appStateRef.on('value', (snapshot) => {
@@ -27,41 +32,65 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAllLists();
     });
 
-    function renderAllLists() {
-        waitingList.innerHTML = '';
-        absentList.innerHTML = '';
-        (appState.waiting || []).forEach(itemData => createListItem(itemData, waitingList));
-        (appState.absent || []).forEach(itemData => createListItem(itemData, absentList));
+    // --- QRコードスキャナ関連の処理 ---
+    scanQrBtn.addEventListener('click', startScanner);
+    closeScannerBtn.addEventListener('click', stopScanner);
+
+    function startScanner() {
+        if (!patientIdInput.value.trim() || patientIdInput.value.trim().length !== 7) {
+            alert('先に正しい患者ID (7桁) を入力してください。');
+            return;
+        }
+        scannerContainer.classList.remove('hidden');
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(stream => {
+                videoStream = stream;
+                videoPreview.srcObject = stream;
+                videoPreview.play();
+                requestAnimationFrame(tick);
+            })
+            .catch(err => {
+                console.error("カメラのアクセスに失敗しました:", err);
+                alert("カメラを起動できませんでした。ブラウザのカメラアクセス許可を確認してください。");
+                stopScanner();
+            });
     }
 
-    function createListItem(itemData, targetList) {
-        const listItem = document.createElement('li');
-        listItem.dataset.num = itemData.num;
-        listItem.dataset.id = itemData.id;
-        listItem.dataset.timestamp = itemData.timestamp;
-        if(itemData.isCalling) {
-            listItem.classList.add('is-calling');
+    function stopScanner() {
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
         }
-        listItem.draggable = true;
-        targetList.appendChild(listItem);
-        updateListItemContent(listItem);
+        scannerContainer.classList.add('hidden');
     }
-    
-    function updateDatabase() {
-        function getListItems(listElement) {
-            return [...listElement.children].map(item => ({
-                num: item.dataset.num, id: item.dataset.id, timestamp: item.dataset.timestamp,
-                isCalling: item.classList.contains('is-calling')
-            }));
+
+    function tick() {
+        if (videoPreview.readyState === videoPreview.HAVE_ENOUGH_DATA) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = videoPreview.videoWidth;
+            canvas.height = videoPreview.videoHeight;
+            ctx.drawImage(videoPreview, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert",
+            });
+
+            if (code) {
+                stopScanner();
+                receptionNumInput.value = code.data;
+                registerBtn.click(); // 自動で登録ボタンをクリック
+            } else {
+                if (!scannerContainer.classList.contains('hidden')) {
+                    requestAnimationFrame(tick);
+                }
+            }
+        } else {
+            if (!scannerContainer.classList.contains('hidden')) {
+                requestAnimationFrame(tick);
+            }
         }
-        const newState = {
-            waiting: getListItems(waitingList),
-            absent: getListItems(absentList),
-            completed: appState.completed || []
-        };
-        appStateRef.set(newState);
     }
-    
+     
     // --- イベントリスナー ---
     function enforceNumericInput(event) { event.target.value = event.target.value.replace(/[^0-9]/g, ''); }
     patientIdInput.addEventListener('input', enforceNumericInput);

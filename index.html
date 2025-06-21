@@ -7,6 +7,14 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="qr-scanner-container" class="hidden">
+        <video id="qr-video-preview"></video>
+        <div class="scanner-overlay">
+            <div class="scanner-box"></div>
+        </div>
+        <button id="close-scanner-btn">閉じる</button>
+    </div>
+
     <div class="admin-panel admin-font-size">
         <header class="admin-header">
             <h1>会計呼び出し管理画面</h1>
@@ -24,6 +32,7 @@
             <h2>新規受付</h2>
             <input type="text" id="patient-id-input" placeholder="患者ID (7桁)" maxlength="7">
             <input type="text" id="reception-num-input" placeholder="受付番号">
+            <button id="scan-qr-btn">QR読取</button>
             <button id="register-btn" class="register-main-btn">登録</button>
         </section>
         
@@ -39,18 +48,12 @@
             </section>
         </div>
     </div>
-    
-    <div id="admin-fullscreen-alert" class="fullscreen-alert hidden">
-        <div class="alert-message">
-            <div id="admin-alert-text" class="alert-number-large"></div>
-        </div>
-    </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     
     <script>
-      // ご提供いただいたConfig情報を埋め込み済みです
       const firebaseConfig = {
         apiKey: "AIzaSyCvyq9yVNHe0HnC6TIsQxZxETPG5AJBvN0",
         authDomain: "clinic-call-app.firebaseapp.com",
@@ -60,8 +63,6 @@
         messagingSenderId: "920156660969",
         appId: "1:920156660969:web:8cda6747a229dead31fc78"
       };
-      
-      // Firebaseを初期化
       firebase.initializeApp(firebaseConfig);
     </script>
     <script src="script.js"></script>
